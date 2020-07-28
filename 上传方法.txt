@@ -4,4 +4,3 @@ git commit -m "注释语句"
 
 git remote add origin git@github.com:bternity/ML2020.git
 git push -u origin master 
-git push -u origin master
