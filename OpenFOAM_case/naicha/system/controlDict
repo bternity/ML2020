@@ -1,0 +1,122 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  5                                     |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     twoLiquidMixingFoam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         50;
+
+deltaT          0.05;
+
+writeControl    adjustableRunTime;
+
+writeInterval   1;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression uncompressed;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable yes;
+
+adjustTimeStep  on;
+
+maxCo           0.5;
+maxAlphaCo      0.5;
+maxDeltaT       1;
+
+
+functions
+{
+    towmixEnergy
+    {
+        functionObjectLibs ("libutilityFunctionObjects.so");
+        type coded;
+        redirectType calculatingtowmixEnergy;
+        codeExecute
+        #{
+            const volVectorField& U = mesh().lookupObject<volVectorField>("U");
+            const volScalarField& rho = mesh().lookupObject<volScalarField>("rho");
+            const volScalarField& alpha3 = mesh().lookupObject<volScalarField>("alpha.sludge");
+
+            scalar Ek1 = 0.0;
+            scalar Ek2 = 0.0;
+            scalar Ek3 = 0.0;
+            scalar V1 = 0.0;
+            scalar V2 = 0.0;
+            scalar V3 = 0.0;
+
+
+            forAll(alpha3, celli)
+            {         
+              if (alpha3[celli] <= 0.2)
+                     {
+                      V1 += mesh().V()[celli];
+                      Ek1 += mesh().V()[celli]*0.5*rho[celli]*mag(U[celli])*mag(U[celli])*(1-alpha3[celli]);//计算水域动能,1/2*m*V^2    
+                     }       
+              if (alpha3[celli] <=0.7 && alpha3[celli] >=0.3)
+                    {
+                      V2 += mesh().V()[celli];
+                      Ek2 += mesh().V()[celli]*0.5*rho[celli]*mag(U[celli])*mag(U[celli])*alpha3[celli];//计算水域动能,1/2*m*V^2    
+                    }
+              if (alpha3[celli] >= 0.8)
+                    {
+                      V3 += mesh().V()[celli];
+                      Ek3 += mesh().V()[celli]*0.5*rho[celli]*mag(U[celli])*mag(U[celli])*alpha3[celli];//计算水域动能,1/2*m*V^2    
+                    }
+
+
+            }
+
+            reduce(Ek1, sumOp<scalar>());
+            reduce(Ek2, sumOp<scalar>());
+            reduce(Ek3, sumOp<scalar>());
+            reduce(V3, sumOp<scalar>());
+            reduce(V1, sumOp<scalar>());
+            reduce(V2, sumOp<scalar>());
+        
+           if (Pstream::master())          
+               {
+                 ofstream output;
+     output.open("E", std::ios::app);
+                 output << "\n" << mesh().time().value() 
+                        << "  " << V1
+                        << "  " << V2
+                        << "  " << V3
+                        << "  " << Ek1
+                        << "  " << Ek2
+                        << "  " << Ek3;
+                 output.close();
+               }
+        #};
+    }
+}
+
+
+// ************************************************************************* //
